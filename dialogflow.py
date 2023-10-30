@@ -37,8 +37,3 @@ for item in testing_data:
         text, project_id, session_id, language_code)
     predicted_intents.append(predicted_intent)
     print(predicted_intent)
-correct_predictions = sum(1 for actual, predicted in zip(
-    testing_data, predicted_intents) if actual == predicted)
-accuracy = correct_predictions / len(testing_data) * 100
-
-print(f"Accuracy: {accuracy}%")

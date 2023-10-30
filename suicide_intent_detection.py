@@ -1,3 +1,6 @@
+import os
+from google.cloud import dialogflow_v2
+import uuid
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.svm import SVC
 from sklearn.naive_bayes import GaussianNB
@@ -13,37 +16,40 @@ import numpy as np
 happy = pd.read_csv('happy.csv')
 emotions = pd.read_csv('tweet_emotions.csv')
 suicide = pd.read_csv('Suicide_Detection.csv')
-
 data = []
 
 happy_data = happy[['cleaned_hm']].rename(
-    columns={'cleaned_hm': 'text'}).head(1000)
-happy_data['class'] = 'happy'
+    columns={'cleaned_hm': 'text'}).head(5)
+happy_data['class'] = 'Happy Intent'
 data.append(happy_data)
 
 sad_emotions_data = emotions[emotions['sentiment'] == 'sadness'][[
-    'content']].rename(columns={'content': 'text'}).head(1000)
-sad_emotions_data['class'] = 'sad'
+    'content']].rename(columns={'content': 'text'}).head(5)
+sad_emotions_data['class'] = 'Sad Intent'
 data.append(sad_emotions_data)
 
 neutral_emotions_data = emotions[emotions['sentiment'].isin(
-    ['empty', 'neutral'])][['content']].rename(columns={'content': 'text'}).head(1000)
-neutral_emotions_data['class'] = 'normal'
+    ['empty', 'neutral'])][['content']].rename(columns={'content': 'text'}).head(5)
+neutral_emotions_data['class'] = 'Normal Intent'
 data.append(neutral_emotions_data)
 
 suicide_data = suicide[suicide['class'] == 'suicide'][[
-    'text']].rename(columns={'text': 'text'}).head(1000)
-suicide_data['class'] = 'suicide'
+    'text']].rename(columns={'text': 'text'}).head(5)
+suicide_data['class'] = 'Suicide Intent'
 data.append(suicide_data)
 
 dataset = pd.concat(data, ignore_index=True)
-dataset.to_csv('suicide_intent_dataset.csv', index=False)
-dataset = pd.read_csv('suicide_intent_dataset.csv')
+# dataset.to_csv('cleaned_suicide_intent_dataset.csv', index=False)
+
+# dataset=pd.read_csv('suicide_intent_dataset.csv')
+# dataset
+
 class_counts = dataset['class'].value_counts()
+print(class_counts)
 
 # nltk.download('stopwords')
 corpus = []
-for i in range(0, 4000):
+for i in range(0, 20):
     review = re.sub('[^a-zA-Z]', ' ', dataset['text'][i])
     review = review.lower()
     review = review.split()
@@ -54,6 +60,9 @@ for i in range(0, 4000):
               for word in review if not word in set(all_stopwords)]
     review = ' '.join(review)
     corpus.append(review)
+
+
+print(corpus)
 
 cv = CountVectorizer()
 X = cv.fit_transform(corpus).toarray()
@@ -73,4 +82,46 @@ print(np.concatenate((y_pred.reshape(len(y_pred), 1), y_test.reshape(len(y_test)
 
 cm = confusion_matrix(y_test, y_pred)
 print(cm)
-accuracy_score(y_test, y_pred)
+print(f'Accuracy:', accuracy_score(y_test, y_pred)*100, '%')
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
+
+
+def detect_intent(text, project_id, session_id, language_code):
+    session_client = dialogflow_v2.SessionsClient()
+    session = session_client.session_path(project_id, session_id)
+
+    text_input = dialogflow_v2.TextInput(
+        text=text, language_code=language_code)
+    query_input = dialogflow_v2.QueryInput(text=text_input)
+
+    response = session_client.detect_intent(
+        session=session, query_input=query_input
+    )
+
+    intent = response.query_result.intent.display_name
+    return intent
+
+
+project_id = "suicide-intent-detection"
+session_id = str(uuid.uuid4())
+language_code = "en"
+
+corpus = np.array(corpus)
+
+predicted_intents = []
+for i in range(0, 20):
+    text = corpus[i]
+    text_chunks = [text[i:i+256] for i in range(0, len(text), 256)]
+    predicted_intents_for_text = []
+
+    for chunk in text_chunks:
+        predicted_intent = detect_intent(
+            chunk, project_id, session_id, language_code)
+        predicted_intents_for_text.append(predicted_intent)
+    combined_intent = " ".join(predicted_intents_for_text)
+    predicted_intents.append(combined_intent)
+
+predicted_intents = np.array(predicted_intents)
+
+print(f'Accuracy:', accuracy_score(y, predicted_intents)*100, '%')
