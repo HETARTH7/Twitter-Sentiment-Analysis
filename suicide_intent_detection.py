@@ -15,7 +15,7 @@ import numpy as np
 
 happy = pd.read_csv('happy.csv')
 emotions = pd.read_csv('tweet_emotions.csv')
-suicide = pd.read_csv('Suicide_Detection.csv')
+suicide = pd.read_csv('twitter-suicidal_data.csv')
 
 data = []
 
@@ -34,13 +34,12 @@ neutral_emotions_data = emotions[emotions['sentiment'].isin(
 neutral_emotions_data['class'] = 'Normal Intent'
 data.append(neutral_emotions_data)
 
-suicide_data = suicide[suicide['class'] == 'suicide'][[
-    'text']].rename(columns={'text': 'text'}).head(100)
-suicide_data['class'] = 'Suicide Intent'
-data.append(suicide_data)
+suicidal_intent_data = suicide[suicide['intention'] == 1][[
+    'tweet']].rename(columns={'tweet': 'text'}).head(100)
+suicidal_intent_data['class'] = 'Suicidal Intent'
+data.append(suicidal_intent_data)
 
 dataset = pd.concat(data, ignore_index=True)
-# dataset.to_csv('cleaned_suicide_intent_dataset.csv', index=False)
 
 # dataset=pd.read_csv('suicide_intent_dataset.csv')
 # dataset
