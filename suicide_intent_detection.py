@@ -3,17 +3,15 @@ from google.cloud import dialogflow_v2
 import uuid
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.svm import SVC
-from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 import nltk
-from nltk import pos_tag
-from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import re
@@ -27,22 +25,22 @@ suicide = pd.read_csv('twitter-suicidal_data.csv')
 data = []
 
 happy_data = happy[['cleaned_hm']].rename(
-    columns={'cleaned_hm': 'text'}).head(25)
+    columns={'cleaned_hm': 'text'}).head(100)
 happy_data['class'] = 'Happy Intent'
 data.append(happy_data)
 
 sad_emotions_data = emotions[emotions['sentiment'] == 'sadness'][[
-    'content']].rename(columns={'content': 'text'}).head(25)
+    'content']].rename(columns={'content': 'text'}).head(100)
 sad_emotions_data['class'] = 'Sad Intent'
 data.append(sad_emotions_data)
 
 neutral_emotions_data = emotions[emotions['sentiment'].isin(
-    ['empty', 'neutral'])][['content']].rename(columns={'content': 'text'}).head(25)
+    ['empty', 'neutral'])][['content']].rename(columns={'content': 'text'}).head(100)
 neutral_emotions_data['class'] = 'Normal Intent'
 data.append(neutral_emotions_data)
 
 suicidal_intent_data = suicide[suicide['intention'] == 1][[
-    'tweet']].rename(columns={'tweet': 'text'}).head(25)
+    'tweet']].rename(columns={'tweet': 'text'}).head(400)
 suicidal_intent_data['class'] = 'Suicidal Intent'
 data.append(suicidal_intent_data)
 
@@ -51,13 +49,24 @@ dataset = pd.concat(data, ignore_index=True)
 # dataset=pd.read_csv('suicide_intent_dataset.csv')
 dataset
 
+rows_to_remove = dataset[dataset['text'].apply(len) > 256].index
+dataset = dataset.drop(rows_to_remove, axis=0).reset_index(drop=True)
+print("Updated dataset size:", dataset.shape[0])
+
+# c=0
+# for i in range(dataset['text'].size):
+#     if(len(dataset['text'][i])>256):
+#         c=c+1
+
+# print(c)
+# print(dataset['text'].size)
+
 class_counts = dataset['class'].value_counts()
 print(class_counts)
 
 
 # nltk.download('stopwords')
 # nltk.download('punkt')
-# nltk.download('averaged_perceptron_tagger')
 
 
 def preprocess_text(text):
@@ -68,29 +77,20 @@ def preprocess_text(text):
     return text
 
 
-def remove_stopwords(tokens):
-    stop_words = set(stopwords.words('english'))
-    return [word for word in tokens if word not in stop_words]
-
-
-def tokenize_stem_pos(text):
+def tokenize_and_remove_stopwords(text):
     tokens = word_tokenize(text)
-    tokens = remove_stopwords(tokens)
-    stemmer = PorterStemmer()
-    stemmed_tokens = [stemmer.stem(token) for token in tokens]
-    pos_tags = pos_tag(tokens)
+    stop_words = set(stopwords.words('english'))
+    tokens = [word for word in tokens if word not in stop_words]
 
-    return stemmed_tokens, pos_tags
+    return ' '.join(tokens)
 
 
 dataset['cleaned_text'] = dataset['text'].apply(preprocess_text)
-dataset['tokenized_text'], dataset['pos_tags'] = zip(
-    *dataset['cleaned_text'].map(tokenize_stem_pos))
-dataset['features'] = dataset.apply(
-    lambda row: row['tokenized_text'] + [tag[1] for tag in row['pos_tags']], axis=1)
+dataset['tokenized_text'] = dataset['cleaned_text'].apply(
+    tokenize_and_remove_stopwords)
 dataset
 
-corpus = dataset['cleaned_text']
+corpus = dataset['tokenized_text']
 
 
 all_words = ' '.join(corpus)
@@ -106,25 +106,26 @@ X = cv.fit_transform(corpus).toarray()
 y = dataset['class'].values
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=0)
+    dataset['tokenized_text'], y, test_size=0.2, random_state=42)
+
+tfidf_vectorizer = TfidfVectorizer(max_features=1500)
+X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
+X_test_tfidf = tfidf_vectorizer.transform(X_test)
 
 lr_classifier = LogisticRegression()
-lr_classifier.fit(X_train, y_train)
+lr_classifier.fit(X_train_tfidf, y_train)
 
 dt_classifier = DecisionTreeClassifier()
-dt_classifier.fit(X_train, y_train)
+dt_classifier.fit(X_train_tfidf, y_train)
 
 rf_classifier = RandomForestClassifier()
-rf_classifier.fit(X_train, y_train)
-
-gnb_classifier = GaussianNB()
-gnb_classifier.fit(X_train, y_train)
+rf_classifier.fit(X_train_tfidf, y_train)
 
 svm_classifier = SVC(kernel='linear', random_state=0)
-svm_classifier.fit(X_train, y_train)
+svm_classifier.fit(X_train_tfidf, y_train)
 
-y_pred = svm_classifier.predict(X_test)
-print(np.concatenate((y_pred.reshape(len(y_pred), 1), y_test.reshape(len(y_test), 1)), 1))
+y_pred = svm_classifier.predict(X_test_tfidf)
+# print(np.concatenate((y_pred.reshape(len(y_pred),1), y_test.reshape(len(y_test),1)),1))
 
 cm = confusion_matrix(y_test, y_pred)
 print(cm)
@@ -135,6 +136,8 @@ dfx_train, dfx_test, dfy_train, dfy_test = train_test_split(
     df_x, y, test_size=0.2, random_state=0)
 train_data = pd.DataFrame({'text': dfx_train, 'class': dfy_train})
 # train_data.to_csv('dialogflow_training_dataset.csv', index=False)
+
+print(dfx_test.size)
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/Users/HETARTH RAVAL/Desktop/AI/Machine Learning/projects/suicide-intent-detection-d40b46ea43fa.json"
 
@@ -160,16 +163,14 @@ session_id = str(uuid.uuid4())
 language_code = "en"
 
 predicted_intents = []
-for i in range(0, 20):
+for i in range(len(dfx_test)):
     text = dfx_test[i]
-    text_chunks = [text[i:i+256] for i in range(0, len(text), 256)]
-    predicted_intents_for_text = []
-
-    for chunk in text_chunks:
-        predicted_intent = detect_intent(
-            chunk, project_id, session_id, language_code)
-        predicted_intents_for_text.append(predicted_intent)
-    combined_intent = " ".join(predicted_intents_for_text)
-    predicted_intents.append(combined_intent)
+    predicted_intent = detect_intent(
+        text, project_id, session_id, language_code)
+    predicted_intents.append(predicted_intent)
+predicted_intents = np.array(predicted_intents)
 
 print(f'Accuracy:', accuracy_score(dfy_test, predicted_intents)*100, '%')
+
+# print(np.concatenate((dfy_test.reshape(len(dfy_test),1), predicted_intents.reshape(len(predicted_intents),1)),1))
+# print(np.concatenate((dfx_test.reshape(len(dfx_test),1), dfy_test.reshape(len(dfy_test),1)),1))
