@@ -141,7 +141,7 @@ train_data = pd.DataFrame({'text': dfx_train, 'class': dfy_train})
 
 print(dfx_test.size)
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "C:/Users/HETARTH RAVAL/Desktop/AI/Machine Learning/projects/suicide-intent-detection-d40b46ea43fa.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
 
 
 def detect_intent(text, project_id, session_id, language_code):
