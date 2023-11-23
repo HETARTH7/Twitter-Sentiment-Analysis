@@ -53,13 +53,14 @@ rows_to_remove = dataset[dataset['text'].apply(len) > 256].index
 dataset = dataset.drop(rows_to_remove, axis=0).reset_index(drop=True)
 print("Updated dataset size:", dataset.shape[0])
 
-# c=0
-# for i in range(dataset['text'].size):
-#     if(len(dataset['text'][i])>256):
-#         c=c+1
+c = 0
+for i in range(dataset['text'].size):
+    if (len(dataset['text'][i]) > 256):
+        c = c+1
 
-# print(c)
-# print(dataset['text'].size)
+print(c)
+print(dataset['text'].size)
+# dataset.to_csv('suicide_intent_detection_dataset.csv', index=False)
 
 class_counts = dataset['class'].value_counts()
 print(class_counts)
@@ -108,7 +109,7 @@ y = dataset['class'].values
 X_train, X_test, y_train, y_test = train_test_split(
     dataset['tokenized_text'], y, test_size=0.2, random_state=42)
 
-tfidf_vectorizer = TfidfVectorizer(max_features=1500)
+tfidf_vectorizer = TfidfVectorizer(max_features=1000)
 X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
 X_test_tfidf = tfidf_vectorizer.transform(X_test)
 
@@ -128,6 +129,7 @@ y_pred = svm_classifier.predict(X_test_tfidf)
 # print(np.concatenate((y_pred.reshape(len(y_pred),1), y_test.reshape(len(y_test),1)),1))
 
 cm = confusion_matrix(y_test, y_pred)
+print('Confusion Matrix:')
 print(cm)
 print(f'Accuracy:', accuracy_score(y_test, y_pred)*100, '%')
 
@@ -173,4 +175,5 @@ predicted_intents = np.array(predicted_intents)
 print(f'Accuracy:', accuracy_score(dfy_test, predicted_intents)*100, '%')
 
 # print(np.concatenate((dfy_test.reshape(len(dfy_test),1), predicted_intents.reshape(len(predicted_intents),1)),1))
+
 # print(np.concatenate((dfx_test.reshape(len(dfx_test),1), dfy_test.reshape(len(dfy_test),1)),1))
