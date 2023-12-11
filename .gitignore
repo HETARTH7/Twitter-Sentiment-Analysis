@@ -1,6 +1,5 @@
-happy.csv
-tweet_emotions.csv
-Suicide_Detection.csv
+
+*.csv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

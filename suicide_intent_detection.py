@@ -1,6 +1,3 @@
-import os
-from google.cloud import dialogflow_v2
-import uuid
 from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
@@ -48,19 +45,6 @@ dataset = pd.concat(data, ignore_index=True)
 
 # dataset=pd.read_csv('suicide_intent_dataset.csv')
 dataset
-
-rows_to_remove = dataset[dataset['text'].apply(len) > 256].index
-dataset = dataset.drop(rows_to_remove, axis=0).reset_index(drop=True)
-print("Updated dataset size:", dataset.shape[0])
-
-c = 0
-for i in range(dataset['text'].size):
-    if (len(dataset['text'][i]) > 256):
-        c = c+1
-
-print(c)
-print(dataset['text'].size)
-# dataset.to_csv('suicide_intent_detection_dataset.csv', index=False)
 
 class_counts = dataset['class'].value_counts()
 print(class_counts)
@@ -132,48 +116,3 @@ cm = confusion_matrix(y_test, y_pred)
 print('Confusion Matrix:')
 print(cm)
 print(f'Accuracy:', accuracy_score(y_test, y_pred)*100, '%')
-
-df_x = np.array(dataset['text'])
-dfx_train, dfx_test, dfy_train, dfy_test = train_test_split(
-    df_x, y, test_size=0.2, random_state=0)
-train_data = pd.DataFrame({'text': dfx_train, 'class': dfy_train})
-# train_data.to_csv('dialogflow_training_dataset.csv', index=False)
-
-print(dfx_test.size)
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
-
-
-def detect_intent(text, project_id, session_id, language_code):
-    session_client = dialogflow_v2.SessionsClient()
-    session = session_client.session_path(project_id, session_id)
-
-    text_input = dialogflow_v2.TextInput(
-        text=text, language_code=language_code)
-    query_input = dialogflow_v2.QueryInput(text=text_input)
-
-    response = session_client.detect_intent(
-        session=session, query_input=query_input
-    )
-
-    intent = response.query_result.intent.display_name
-    return intent
-
-
-project_id = "suicide-intent-detection"
-session_id = str(uuid.uuid4())
-language_code = "en"
-
-predicted_intents = []
-for i in range(len(dfx_test)):
-    text = dfx_test[i]
-    predicted_intent = detect_intent(
-        text, project_id, session_id, language_code)
-    predicted_intents.append(predicted_intent)
-predicted_intents = np.array(predicted_intents)
-
-print(f'Accuracy:', accuracy_score(dfy_test, predicted_intents)*100, '%')
-
-# print(np.concatenate((dfy_test.reshape(len(dfy_test),1), predicted_intents.reshape(len(predicted_intents),1)),1))
-
-# print(np.concatenate((dfx_test.reshape(len(dfx_test),1), dfy_test.reshape(len(dfy_test),1)),1))
