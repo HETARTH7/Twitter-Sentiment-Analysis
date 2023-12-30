@@ -15,33 +15,34 @@ import re
 import pandas as pd
 import numpy as np
 
-happy = pd.read_csv('happy.csv')
-emotions = pd.read_csv('tweet_emotions.csv')
-suicide = pd.read_csv('twitter-suicidal_data.csv')
+happy = pd.read_csv('data/happy.csv')
+emotions = pd.read_csv('data/tweet_emotions.csv')
+suicide = pd.read_csv('data/twitter-suicidal_data.csv')
 
 data = []
 
 happy_data = happy[['cleaned_hm']].rename(
-    columns={'cleaned_hm': 'text'}).head(100)
+    columns={'cleaned_hm': 'text'}).head(1000)
 happy_data['class'] = 'Happy Intent'
 data.append(happy_data)
 
 sad_emotions_data = emotions[emotions['sentiment'] == 'sadness'][[
-    'content']].rename(columns={'content': 'text'}).head(100)
+    'content']].rename(columns={'content': 'text'}).head(1000)
 sad_emotions_data['class'] = 'Sad Intent'
 data.append(sad_emotions_data)
 
 neutral_emotions_data = emotions[emotions['sentiment'].isin(
-    ['empty', 'neutral'])][['content']].rename(columns={'content': 'text'}).head(100)
+    ['empty', 'neutral'])][['content']].rename(columns={'content': 'text'}).head(1000)
 neutral_emotions_data['class'] = 'Normal Intent'
 data.append(neutral_emotions_data)
 
 suicidal_intent_data = suicide[suicide['intention'] == 1][[
-    'tweet']].rename(columns={'tweet': 'text'}).head(400)
+    'tweet']].rename(columns={'tweet': 'text'}).head(1000)
 suicidal_intent_data['class'] = 'Suicidal Intent'
 data.append(suicidal_intent_data)
 
 dataset = pd.concat(data, ignore_index=True)
+# dataset.to_csv('suicide_intent_dataset.csv')
 
 # dataset=pd.read_csv('suicide_intent_dataset.csv')
 dataset
@@ -83,12 +84,28 @@ wordcloud = WordCloud(width=800, height=400, random_state=21,
                       max_font_size=110, background_color='white').generate(all_words)
 plt.figure(figsize=(10, 7))
 plt.imshow(wordcloud, interpolation="bilinear")
+plt.title('Word Cloud of Tokenized Text')
 plt.axis('off')
 plt.show()
 
 cv = CountVectorizer()
 X = cv.fit_transform(corpus).toarray()
 y = dataset['class'].values
+
+words = cv.get_feature_names_out()
+word_frequencies = X.sum(axis=0)
+df_word_freq = pd.DataFrame({'Word': words, 'Frequency': word_frequencies})
+df_word_freq = df_word_freq.sort_values(by='Frequency', ascending=False)
+
+top_n = 50
+plt.figure(figsize=(12, 6))
+plt.bar(df_word_freq['Word'][:top_n],
+        df_word_freq['Frequency'][:top_n], color='skyblue')
+plt.xlabel('Words')
+plt.ylabel('Frequency')
+plt.title(f'Top {top_n} Word Frequencies')
+plt.xticks(rotation=45, ha='right')
+plt.show()
 
 X_train, X_test, y_train, y_test = train_test_split(
     dataset['tokenized_text'], y, test_size=0.2, random_state=42)
@@ -99,20 +116,35 @@ X_test_tfidf = tfidf_vectorizer.transform(X_test)
 
 lr_classifier = LogisticRegression()
 lr_classifier.fit(X_train_tfidf, y_train)
+lr_pred = lr_classifier.predict(X_test_tfidf)
 
 dt_classifier = DecisionTreeClassifier()
 dt_classifier.fit(X_train_tfidf, y_train)
+dt_pred = dt_classifier.predict(X_test_tfidf)
 
 rf_classifier = RandomForestClassifier()
 rf_classifier.fit(X_train_tfidf, y_train)
+rf_pred = rf_classifier.predict(X_test_tfidf)
 
 svm_classifier = SVC(kernel='linear', random_state=0)
 svm_classifier.fit(X_train_tfidf, y_train)
+svm_pred = svm_classifier.predict(X_test_tfidf)
 
-y_pred = svm_classifier.predict(X_test_tfidf)
-# print(np.concatenate((y_pred.reshape(len(y_pred),1), y_test.reshape(len(y_test),1)),1))
-
-cm = confusion_matrix(y_test, y_pred)
+cm = confusion_matrix(y_test, svm_pred)
 print('Confusion Matrix:')
 print(cm)
-print(f'Accuracy:', accuracy_score(y_test, y_pred)*100, '%')
+print(f'Accuracy:', accuracy_score(y_test, svm_pred)*100, '%')
+
+plt.figure(figsize=(8, 6))
+plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+plt.title('Confusion Matrix')
+plt.colorbar()
+
+classes = dataset['class'].unique()
+tick_marks = np.arange(len(classes))
+plt.xticks(tick_marks, classes, rotation=45)
+plt.yticks(tick_marks, classes)
+
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.show()
