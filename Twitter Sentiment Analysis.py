@@ -83,21 +83,48 @@ stop_words = stopwords.words('english')
 cv=CountVectorizer(tokenizer=word_tokenize,stop_words=stop_words,ngram_range=(1,1))
 
 # %%
-X,y=cv.fit_transform(train_ds['tokenized_text']).toarray(),train_ds[2]
+X,y=cv.fit_transform(train_ds['tokenized_text']),train_ds[2]
 
 # %%
 from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(train_ds['tokenized_text'], y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # %%
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
-model1 = LogisticRegression()
-model1.fit(X_train, y_train)
+lr_classifier = LogisticRegression(max_iter=500)
+lr_classifier.fit(X_train, y_train)
 
-test_pred = model1.predict(X_test)
-print("Accuracy: ", accuracy_score(y_test, test_pred) * 100)
+lr_pred = lr_classifier.predict(X_test)
+print("Logistic Regression Accuracy: ", accuracy_score(y_test, lr_pred) * 100)
+
+# %%
+from sklearn.svm import SVC
+
+svm_classifier = SVC(kernel='linear', random_state=0)
+svm_classifier.fit(X_train, y_train)
+
+svm_pred = svm_classifier.predict(X_test)
+print("SVM Accuracy: ", accuracy_score(y_test, svm_pred) * 100)
+
+# %%
+from sklearn.tree import DecisionTreeClassifier
+
+dt_classifier = DecisionTreeClassifier()
+dt_classifier.fit(X_train, y_train)
+
+dt_pred = dt_classifier.predict(X_test)
+print("Decision Tree Accuracy: ", accuracy_score(y_test, dt_pred) * 100)
+
+# %%
+from sklearn.ensemble import RandomForestClassifier
+
+rf_classifier = RandomForestClassifier()
+rf_classifier.fit(X_train, y_train)
+
+rf_pred = rf_classifier.predict(X_test)
+print("Random Forest Accuracy: ", accuracy_score(y_test, rf_pred) * 100)
 
 # %%
 
